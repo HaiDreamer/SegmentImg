@@ -2,6 +2,15 @@ import numpy as np, keras, tensorflow as tf
 from pathlib import Path
 from segtrain.metrics import compute_confusion_matrix, miou_from_confmat
 
+'''
+Call back for each epoch
+    run model on val dataset
+    cal pixel accuracy and mIoU, boundary loss(BCE = binary cross entropy) of have boundary head 
+        boundary head = specialized module added to a neural network explicitly increase network ability
+                         to detect and delineate object boundaries
+    save model if mIoU increase(overwrite model lower mIoU)
+'''
+
 class EvalCallback(tf.keras.callbacks.Callback):
     def __init__(self, val_ds, num_classes: int, ignore_index: int, ckpt_path: Path):
         super().__init__()

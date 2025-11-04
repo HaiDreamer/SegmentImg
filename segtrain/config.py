@@ -59,9 +59,9 @@ def parse_args_with_defaults():
                 loss="focal", use_advanced_aug=True,
                 save_dir="/content/drive/MyDrive/SegmentImg/models",
             )
-            print("🌐 Running on Google Colab")
-            print(f"📁 Labelmap: {labelmap_path}")
-            print("💾 Models will be saved to: /content/drive/MyDrive/SegmentImg/models")
+            print("Running on Google Colab")
+            print(f"Labelmap: {labelmap_path}")
+            print("Models will be saved to: /content/drive/MyDrive/SegmentImg/models")
         else:
             drive_root = guess_google_drive_windows()
             if drive_root is not None:
@@ -80,7 +80,7 @@ def parse_args_with_defaults():
                     use_advanced_aug=True,
                     save_dir=(drive_root / "SegmentImg/models").as_posix(),
                 )
-                print(f"💻 Running on Local Machine (Google Drive detected at: {drive_root})")
+                print(f"Running on Local Machine (Google Drive detected at: {drive_root})")
             else:
                 p.set_defaults(
                     data_roots=[
@@ -96,7 +96,7 @@ def parse_args_with_defaults():
                     architecture="attention_unet", loss="focal",
                     use_advanced_aug=True, save_dir="models",
                 )
-                print("💻 Running on Local Machine (no Google Drive found)")
+                print("Running on Local Machine (no Google Drive found)")
         return p.parse_args(unknown_args)
     else:
         args = known_args
@@ -116,14 +116,14 @@ def check_paths(roots, labelmap, save_dir, is_colab: bool):
         ip = Path(r) / "ImageSets" / "Segmentation"
         if jp.exists() and sp.exists() and ip.exists():
             n_images = len(list(jp.glob("*"))) if jp.exists() else 0
-            print(f"✅ {Path(r).name}: {n_images} images")
+            print(f"{Path(r).name}: {n_images} images")
         else:
-            print(f"❌ {Path(r).name}: Missing VOC folders")
+            print(f"{Path(r).name}: Missing VOC folders")
             missing.append(r)
     if missing:
-        print(f"\n  Warning: {len(missing)} dataset(s) not found!")
+        print(f"\nWarning: {len(missing)} dataset(s) not found!")
         if is_colab:
-            print("💡 Tip: Mount Drive and place data under /content/drive/MyDrive/SegmentImg/data/")
+            print("Tip: Mount Drive and place data under /content/drive/MyDrive/SegmentImg/data/")
         print("\nContinue anyway? (y/n): ", end="")
         if not is_colab:
             if input().strip().lower() != 'y':
@@ -131,12 +131,12 @@ def check_paths(roots, labelmap, save_dir, is_colab: bool):
 
     lp = Path(labelmap)
     if not lp.exists():
-        print(f"\n❌ Labelmap not found: {labelmap}")
+        print(f"\nLabelmap not found: {labelmap}")
         if is_colab:
             print("💡 Tip: Upload labelmap.txt to /content/ or /content/drive/MyDrive/SegmentImg/")
         raise SystemExit(f"Labelmap file not found: {labelmap}")
-    else: print(f"✅ Labelmap: {labelmap}")
+    else: print(f"Labelmap: {labelmap}")
 
     sd = Path(save_dir); sd.mkdir(parents=True, exist_ok=True)
-    print(f"💾 Save directory: {save_dir}")
+    print(f"Save directory: {save_dir}")
     print("="*60 + "\n")

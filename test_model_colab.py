@@ -1,8 +1,3 @@
-"""
-Test Model trên Google Colab
-Sử dụng: Upload file này lên Colab và chạy với arguments hoặc không có arguments (dùng defaults)
-"""
-
 import os
 import sys
 from pathlib import Path
@@ -11,6 +6,14 @@ from PIL import Image
 import tensorflow as tf
 import keras
 import argparse
+
+r'''
+Test Model trên Google Colab
+Sử dụng: Upload file này lên Colab và chạy với arguments hoặc không có arguments (dùng defaults)
+
+How to run:
+python test_model_colab.py --model_path "D:\animal_data\models\unet_backbone_focal_best.keras" --image_path "D:\animal_data\img_segment\data\fox\JPEGImages\00000002_512resized.png" --output_dir test_results --labelmap labelmap.txt --save_boundary
+'''
 
 # Phát hiện Colab
 is_colab = os.path.exists("/content") or "COLAB_GPU" in os.environ
@@ -104,7 +107,7 @@ def main():
         else:
             # Local defaults
             parser.set_defaults(
-                model_path=r"D:\animal_data\models\unet_boundary_best.keras",
+                model_path=r"D:\animal_data\models\unet_backbone_focal_best.keras",
                 image_path=r"D:\animal_data\data\cheetah\JPEGImages\00000000_512resized.png",
                 output_dir=r"D:\animal_data\test_results",
                 labelmap=r"D:\animal_data\img_segment\labelmap.txt",
@@ -218,16 +221,22 @@ def main():
         boundary_img.save(output_dir / "pred_boundary.png")
         print(f"   ✅ Saved boundary heatmap")
     
-    # 4. Overlay trên ảnh gốc (resize về kích thước gốc)
+    # 4. Overlay trên ảnh gốc
+    # Load lại ảnh gốc để overlay
+    img_orig = Image.open(image_path).convert("RGB")
+    
+    # Resize prediction về kích thước ảnh gốc nếu cần
     if orig_size != img.size:
         pred_resized = Image.fromarray(pred.astype(np.uint8), mode="L").resize(orig_size, Image.NEAREST)
         pred_color_resized = colorize_index_mask(np.array(pred_resized), colors)
-        
-        # Blend với ảnh gốc
-        img_orig = Image.open(image_path).convert("RGB")
-        overlay = Image.blend(img_orig, pred_color_resized, 0.5)
-        overlay.save(output_dir / "pred_overlay.png")
-        print(f"   ✅ Saved overlay")
+    else:
+        # Nếu kích thước không đổi, dùng prediction trực tiếp
+        pred_color_resized = pred_color
+    
+    # Blend với ảnh gốc
+    overlay = Image.blend(img_orig, pred_color_resized, 0.5)
+    overlay.save(output_dir / "pred_overlay.png")
+    print(f"   ✅ Saved overlay")
     
     print(f"\n✅ Test completed!")
     print(f"\n📁 Results saved to: {output_dir}")
@@ -235,8 +244,7 @@ def main():
     print(f"   - pred_color.png (colorized mask)")
     if boundary_logits is not None and args.save_boundary:
         print(f"   - pred_boundary.png (boundary heatmap)")
-    if orig_size != img.size:
-        print(f"   - pred_overlay.png (overlay on original image)")
+    print(f"   - pred_overlay.png (overlay on original image)")
     
     # Hiển thị prediction stats
     unique_classes, counts = np.unique(pred, return_counts=True)

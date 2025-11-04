@@ -19,7 +19,7 @@ from scipy import ndimage as ndi
 from skimage.feature import peak_local_max
 from skimage.segmentation import watershed
 
-# ---------- Pillow resampling shim (handles Pillow 9/10+) ----------
+# Pillow resampling shim (handles Pillow 9/10+)
 from PIL import Image as _PILImage
 if hasattr(_PILImage, "Resampling"):
     RESAMPLE_BILINEAR = _PILImage.Resampling.BILINEAR
@@ -28,7 +28,7 @@ else:
     RESAMPLE_BILINEAR = _PILImage.BILINEAR
     RESAMPLE_NEAREST  = _PILImage.NEAREST
 
-# ---------- Labelmap ----------
+# Labelmap
 def read_labelmap(labelmap_path: Path):
     if not labelmap_path.exists():
         raise FileNotFoundError(f"File not found: {labelmap_path}")
@@ -71,7 +71,7 @@ def mask_rgb_to_index(mask_img: Image.Image, color_to_index: Dict[Tuple[int,int,
         out[keys == k] = idx
     return out.reshape(h, w)
 
-# ---------- Reproducibility ----------
+# Reproducibility
 def set_seed(seed: int = 0, enable_determinism: bool = False):
     random.seed(seed)
     np.random.seed(seed)
@@ -79,7 +79,7 @@ def set_seed(seed: int = 0, enable_determinism: bool = False):
     if enable_determinism:
         tf.config.experimental.enable_op_determinism(True)
 
-# ---------- Metrics ----------
+# Metrics
 def compute_confusion_matrix(pred: np.ndarray, target: np.ndarray, num_classes: int, ignore_index: int=255):
     mask = target != ignore_index
     pred = pred[mask]
@@ -101,7 +101,7 @@ def miou_from_confmat(cm: np.ndarray):
     iou = np.nan_to_num(iou, nan=0.0)
     return mean_iou, list(map(float, iou))
 
-# ---------- U-Net ----------
+# U-Net
 def double_conv_block(x, n_filters, use_bn=True):
     x = layers.Conv2D(n_filters, 3, padding="same",
                       kernel_initializer="he_normal", use_bias=not use_bn)(x)
@@ -144,7 +144,7 @@ def build_unet_with_boundary(input_shape=(512, 512, 3), num_classes=6, dropout=0
     model = Model(inputs, {"sem_logits": sem_logits, "boundary_logits": boundary_logits}, name="UNetBoundary")
     return model
 
-# ---------- Boundary targets ----------
+# Boundary targets 
 def make_boundary_targets(
     mask_batch: np.ndarray,
     ignore_index: int = 255,
@@ -169,7 +169,7 @@ def make_boundary_targets(
     boundary_valid_mask = np.stack(m_list, axis=0).astype(np.float32)     # (N,H,W,1)
     return boundary_targets, boundary_valid_mask
 
-# ---------- Instances (not used in training; here for parity) ----------
+# Instances (not used in training; here for parity)
 def instances_from_sem_and_boundary(
     sem_logits,
     boundary_logits,
@@ -234,7 +234,7 @@ def instances_from_sem_and_boundary(
 def make_unet_model(num_classes: int):
     return build_unet_with_boundary(num_classes=num_classes)
 
-# ---------- Dataset wrapper ----------
+# Dataset wrapper
 class MultiRootVOCDataset:
     """
     Read VOC-style segmentation from multiple dataset roots.
@@ -370,8 +370,7 @@ class MultiRootVOCDataset:
         mask_np = mask.astype(np.int64)
         return img_np, mask_np
 
-
-# ---------- Losses ----------
+# Losses
 def sparse_ce_ignore_index(ignore_index: int, from_logits: bool = True):
     """
     SparseCategoricalCrossentropy that masks out ignore_index.
@@ -388,7 +387,7 @@ def sparse_ce_ignore_index(ignore_index: int, from_logits: bool = True):
         return tf.reduce_sum(per_px) / denom
     return loss
 
-# ---------- tf.data pipelines ----------
+# tf.data pipelines
 def make_tf_dataset(voc: MultiRootVOCDataset, batch_size: int, shuffle: bool,
                     ignore_index: int, num_parallel_calls=tf.data.AUTOTUNE):
     indices = np.arange(len(voc), dtype=np.int32)
@@ -410,16 +409,15 @@ def make_tf_dataset(voc: MultiRootVOCDataset, batch_size: int, shuffle: bool,
         # Labels
         y = {"sem_logits": mask, "boundary_logits": bt}
 
-        # ======== Reweighted boundary sample-weights ========
-        # Focus loss on boundary pixels (positives), keep small weight on negatives.
-        pos_w = 1.0   # try 1.0; can tune up to 2–5 if boundaries are extremely sparse
+        # Reweighted boundary sample-weights
+        pos_w = 1.0   
         neg_w = 0.05  # small non-zero helps stability (0.0..0.1)
         bw = pos_w * bt + neg_w * (1.0 - bt)                 # (H,W,1)
         sw = {
             "boundary_logits": bmask * bw,                   # zero on ignored; positive-focused
             "sem_logits": tf.ones_like(mask, dtype=tf.float32),
         }
-        # ====================================================
+    
 
         return img, y, sw
 
@@ -431,7 +429,7 @@ def make_tf_dataset(voc: MultiRootVOCDataset, batch_size: int, shuffle: bool,
     ds = ds.prefetch(tf.data.AUTOTUNE)
     return ds
 
-# ---------- Evaluation callback ----------
+# Evaluation callback
 class EvalCallback(tf.keras.callbacks.Callback):
     def __init__(self, val_ds, num_classes: int, ignore_index: int, ckpt_path: Path):
         super().__init__()
@@ -471,13 +469,12 @@ class EvalCallback(tf.keras.callbacks.Callback):
 
             per_px = self._bce(boundary_t, boundary_logits).numpy()  # (B,H,W,1)
 
-            # ======== Evaluate BCE only on boundary pixels (and valid area) ========
+            # Evaluate BCE only on boundary pixels (and valid area)
             eval_weight = (boundary_t > 0.5).astype(np.float32)
             ignore_mask = (masks != self.ignore_index)[..., None].astype(np.float32)
             
             denom = (eval_weight * ignore_mask).sum()
             bce_sum += float((per_px * eval_weight * ignore_mask).sum() / max(denom, 1.0))
-            # ======================================================================
 
             n_batches += 1
 
@@ -491,7 +488,7 @@ class EvalCallback(tf.keras.callbacks.Callback):
             self.model.save(self.ckpt_path.as_posix())
             print(f"Saved best to {self.ckpt_path} (mIoU {miou:.3f})")
 
-# ---------- Main ----------
+# Main
 def main_unet():
     p = argparse.ArgumentParser(
         description="U-Net training over multiple VOC-style roots",

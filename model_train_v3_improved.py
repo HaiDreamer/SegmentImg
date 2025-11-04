@@ -1,14 +1,3 @@
-# Improved Model Training Script with Advanced Features
-# Based on model_train_v2.py with enhancements:
-# - Advanced data augmentation
-# - Class imbalance handling (weights/Focal Loss)
-# - Attention U-Net, U-Net++ architectures
-# - Stronger backbones (EfficientNet)
-# - Multiple loss functions (Weighted CE, Focal, Tversky)
-# - Deep supervision
-# - TTA (Test Time Augmentation) for inference
-# - Post-processing pipeline (morphology, connected components, CRF)
-
 import argparse
 import os
 from pathlib import Path
@@ -33,13 +22,12 @@ try:
     CRF_AVAILABLE = True
 except ImportError:
     CRF_AVAILABLE = False
-    # Warning chỉ hiện 1 lần để không spam console
     import warnings
     warnings.filterwarnings('ignore', category=UserWarning)
     # print("Warning: pydensecrf not available. CRF post-processing will be disabled.")
     # print("To install: !pip install git+https://github.com/lucasb-eyer/pydensecrf.git")
 
-# Try to import EfficientNet/ResNeXt backbones
+# import EfficientNet/ResNeXt backbones
 try:
     from keras.applications import EfficientNetB0, EfficientNetB3, EfficientNetB4
     EFFICIENTNET_AVAILABLE = True
@@ -125,7 +113,7 @@ def set_seed(seed: int = 0):
     np.random.seed(seed)
     tf.random.set_seed(seed)
 
-# ========== METRICS ==========
+# METRICS
 def compute_confusion_matrix(pred: np.ndarray, target: np.ndarray, num_classes: int, ignore_index: int=255):
     mask = target != ignore_index
     pred = pred[mask]
@@ -143,7 +131,7 @@ def miou_from_confmat(cm: np.ndarray) -> Tuple[float, List[float]]:
     mean_iou = float(np.mean(iou))
     return mean_iou, list(map(float, iou))
 
-# ========== ADVANCED DATA AUGMENTATION ==========
+# ADVANCED DATA AUGMENTATION
 class AdvancedAugmentation:
     """Advanced augmentation with rotation, color jitter, elastic transform"""
     def __init__(self, 
@@ -238,7 +226,7 @@ class AdvancedAugmentation:
         
         return image, mask
 
-# ========== CLASS IMBALANCE HANDLING ==========
+# CLASS IMBALANCE HANDLING
 def compute_class_weights(masks: List[np.ndarray], num_classes: int, ignore_index: int = 255) -> np.ndarray:
     """Compute class weights from training masks"""
     total_pixels = 0
@@ -256,7 +244,7 @@ def compute_class_weights(masks: List[np.ndarray], num_classes: int, ignore_inde
     
     return class_weights.astype(np.float32)
 
-# ========== LOSS FUNCTIONS ==========
+# LOSS FUNCTIONS
 def sparse_ce_ignore_index(ignore_index: int, from_logits: bool = True):
     """
     SparseCategoricalCrossentropy that masks out ignore_index.
@@ -354,7 +342,7 @@ def tversky_loss(alpha: float = 0.5, beta: float = 0.5, smooth: float = 1e-6, ig
         return 1.0 - tf.reduce_mean(tversky)
     return loss
 
-# ========== MODEL ARCHITECTURES ==========
+# MODEL ARCHITECTURES
 def double_conv_block(x, n_filters, use_bn=True):
     x = layers.Conv2D(n_filters, 3, padding="same", kernel_initializer="he_normal", use_bias=not use_bn)(x)
     if use_bn: x = layers.BatchNormalization()(x)
@@ -413,75 +401,6 @@ def build_attention_unet(input_shape=(512, 512, 3), num_classes=6, dropout=0.2, 
     boundary_logits = layers.Conv2D(1, 1, padding="same", name="boundary_logits")(u9)
     
     model = Model(inputs, [sem_logits, boundary_logits], name="AttentionUNet")
-    return model
-
-# fast but lower? accuracy
-def build_unet_plusplus(input_shape=(512, 512, 3), num_classes=6, dropout=0.2, use_batchnorm=True, deep_supervision=True):
-    """U-Net++ architecture with deep supervision"""
-    inputs = layers.Input(shape=input_shape)
-    
-    # Encoder
-    x00 = inputs
-    f1, p1 = downsample_block(x00, 64, dropout, use_batchnorm)
-    x10 = f1
-
-    f2, p2 = downsample_block(p1, 128, dropout, use_batchnorm)
-    x20 = f2
-    
-    f3, p3 = downsample_block(p2, 256, dropout, use_batchnorm)
-    x30 = f3
-    
-    f4, p4 = downsample_block(p3, 512, dropout, use_batchnorm)
-    x40 = f4
-    
-    # Bottleneck
-    x50 = double_conv_block(p4, 1024, use_bn=use_batchnorm)
-    
-    # Dense connections (U-Net++)
-    x01 = x00  # skip
-    # x11: upsample x10 and concatenate with x01
-    x11_up = layers.Conv2DTranspose(64, kernel_size=3, strides=2, padding="same")(x10)
-    x11_up = layers.Concatenate(axis=-1)([x11_up, x01])
-    x11_up = layers.Dropout(dropout)(x11_up)
-    x11 = double_conv_block(x11_up, 64, use_bn=use_batchnorm)
-    
-    # x21: upsample x20 and concatenate with x11
-    x21_up = layers.Conv2DTranspose(128, kernel_size=3, strides=2, padding="same")(x20)
-    x21_up = layers.Concatenate(axis=-1)([x21_up, x11])
-    x21_up = layers.Dropout(dropout)(x21_up)
-    x21 = double_conv_block(x21_up, 128, use_bn=use_batchnorm)
-    
-    # x31: upsample x30 and concatenate with x21
-    x31_up = layers.Conv2DTranspose(256, kernel_size=3, strides=2, padding="same")(x30)
-    x31_up = layers.Concatenate(axis=-1)([x31_up, x21])
-    x31_up = layers.Dropout(dropout)(x31_up)
-    x31 = double_conv_block(x31_up, 256, use_bn=use_batchnorm)
-    
-    # x41: upsample x40 and concatenate with x31
-    x41_up = layers.Conv2DTranspose(512, kernel_size=3, strides=2, padding="same")(x40)
-    x41_up = layers.Concatenate(axis=-1)([x41_up, x31])
-    x41_up = layers.Dropout(dropout)(x41_up)
-    x41 = double_conv_block(x41_up, 512, use_bn=use_batchnorm)
-    
-    # x51: upsample x50 and concatenate with x41
-    x51_up = layers.Conv2DTranspose(1024, kernel_size=3, strides=2, padding="same")(x50)
-    x51_up = layers.Concatenate(axis=-1)([x51_up, x41])
-    x51_up = layers.Dropout(dropout)(x51_up)
-    x51 = double_conv_block(x51_up, 1024, use_bn=use_batchnorm)
-    
-    # Deep supervision outputs
-    outputs = []
-    if deep_supervision:
-        d1 = layers.Conv2D(num_classes, 1, padding="same", name="ds1")(x21)
-        d2 = layers.Conv2D(num_classes, 1, padding="same", name="ds2")(x31)
-        d3 = layers.Conv2D(num_classes, 1, padding="same", name="ds3")(x41)
-        outputs.extend([d1, d2, d3])
-    
-    sem_logits = layers.Conv2D(num_classes, 1, padding="same", name="sem_logits")(x51)
-    boundary_logits = layers.Conv2D(1, 1, padding="same", name="boundary_logits")(x51)
-    
-    outputs.extend([sem_logits, boundary_logits])
-    model = Model(inputs, outputs, name="UNetPlusPlus")
     return model
 
 def build_unet_with_backbone(input_shape=(512, 512, 3), num_classes=6, backbone="efficientnet", backbone_name="EfficientNetB0", dropout=0.2):
@@ -620,7 +539,7 @@ def instances_from_sem_and_boundary(sem_logits, boundary_logits, thing_class_ids
     
     return instance_map
 
-# ========== ENHANCED DATASET ==========
+# ENHANCED DATASET
 class EnhancedMultiRootVOCDataset:
     """Enhanced dataset with advanced augmentation and class weight computation"""
     def __init__(self, roots: List[str], image_set: str,
@@ -730,7 +649,7 @@ class EnhancedMultiRootVOCDataset:
         mask_np = mask.astype(np.int64)
         return img_np, mask_np
 
-# ========== TF DATA PIPELINE ==========
+# TF DATA PIPELINE
 def make_tf_dataset(voc: EnhancedMultiRootVOCDataset, batch_size: int, shuffle: bool, ignore_index: int):
     indices = np.arange(len(voc), dtype=np.int32)
     
@@ -754,7 +673,7 @@ def make_tf_dataset(voc: EnhancedMultiRootVOCDataset, batch_size: int, shuffle: 
     ds = ds.prefetch(tf.data.AUTOTUNE)
     return ds
 
-# ========== EVALUATION CALLBACK ==========
+# EVALUATION CALLBACK
 class EvalCallback(tf.keras.callbacks.Callback):
     def __init__(self, val_ds, num_classes: int, ignore_index: int, ckpt_path: Path):
         super().__init__()
@@ -808,7 +727,7 @@ class EvalCallback(tf.keras.callbacks.Callback):
             self.model.save(self.ckpt_path.as_posix())
             print(f"Saved best to {self.ckpt_path} (mIoU {miou:.3f})")
 
-# ========== POST-PROCESSING ==========
+# POST-PROCESSING
 class PostProcessor:
     """
     Post-processing pipeline for segmentation masks
@@ -895,7 +814,7 @@ class PostProcessor:
         
         return result
 
-    # ========== TEST TIME AUGMENTATION ==========
+    # TEST TIME AUGMENTATION
     class TTAInference:
         """Test Time Augmentation for inference"""
         def __init__(self, model, tta_transforms=["flip_h", "flip_v", "rotate_90"]):
@@ -961,7 +880,7 @@ class PostProcessor:
             avg_probs = np.mean(predictions, axis=0)
             return np.argmax(avg_probs, axis=-1), avg_probs
 
-# ========== INFERENCE PIPELINE ==========
+# INFERENCE PIPELINE
 def inference_pipeline(model_path: str, image_path: str, output_path: str,
                       labelmap_path: str, crop_size: int = 512,
                       use_tta: bool = True, use_postprocessing: bool = True):
@@ -1040,7 +959,7 @@ def inference_pipeline(model_path: str, image_path: str, output_path: str,
     Image.fromarray(color_mask).save(output_path)
     print(f"Saved prediction to {output_path}")
 
-# ========== MAIN TRAINING FUNCTION ==========
+# MAIN TRAINING FUNCTION
 def main_unet():
     p = argparse.ArgumentParser(
         description="Improved U-Net training with advanced features",
@@ -1076,21 +995,16 @@ def main_unet():
     p.add_argument("--use_advanced_aug", action="store_true",
                    help="Use advanced data augmentation")
     
-    # Xử lý trường hợp chạy trong Colab/Jupyter (có thêm arguments không mong muốn)
-    # Colab có thể thêm -f kernel.json vào command line
     known_args, unknown_args = p.parse_known_args()
     
-    # Phát hiện môi trường Colab
     import os
     is_colab = os.path.exists("/content") or "COLAB_GPU" in os.environ
     
-    # Nếu không có arguments hoặc chỉ có unknown args (Colab kernel), dùng defaults
     if len(sys.argv) == 1 or (len(unknown_args) > 0 and not known_args.data_roots):
-        if is_colab:  # Đang chạy trên Colab
-            # Tự động tìm labelmap ở các vị trí có thể
+        if is_colab: 
             labelmap_candidates = [
-                "/content/labelmap.txt",  # Upload trực tiếp
-                "/content/drive/MyDrive/SegmentImg/labelmap.txt",  # Trên Drive
+                "/content/labelmap.txt", 
+                "/content/drive/MyDrive/SegmentImg/labelmap.txt", 
             ]
             labelmap_path = "/content/labelmap.txt"  # Default
             for candidate in labelmap_candidates:
@@ -1116,9 +1030,9 @@ def main_unet():
                 use_advanced_aug=True,
                 save_dir="/content/drive/MyDrive/SegmentImg/models",
             )
-            print(f"🌐 Running on Google Colab")
-            print(f"📁 Labelmap: {labelmap_path}")
-            print(f"💾 Models will be saved to: /content/drive/MyDrive/SegmentImg/models")
+            print(f"Running on Google Colab")
+            print(f"Labelmap: {labelmap_path}")
+            print(f"Models will be saved to: /content/drive/MyDrive/SegmentImg/models")
         else:  # Local Windows
             p.set_defaults(
                 data_roots=[
@@ -1138,8 +1052,8 @@ def main_unet():
                 use_advanced_aug=True,
                 save_dir="models",
             )
-            print(f"💻 Running on Local Machine")
-        args = p.parse_args(unknown_args)  # Parse với unknown args để ignore chúng
+            print(f"Running on Local Machine")
+        args = p.parse_args(unknown_args)  
     else:
         args = known_args
         if not args.data_roots or not args.labelmap:
@@ -1151,7 +1065,7 @@ def main_unet():
     if not roots:
         p.error("No valid data roots provided")
     
-    # Kiểm tra và hiển thị thông tin về paths
+    # Check path
     print("\n" + "="*60)
     print("CHECKING DATA PATHS")
     print("="*60)
@@ -1162,38 +1076,37 @@ def main_unet():
         ip = Path(r) / "ImageSets" / "Segmentation"
         if jp.exists() and sp.exists() and ip.exists():
             n_images = len(list(jp.glob("*"))) if jp.exists() else 0
-            print(f"✅ {Path(r).name}: {n_images} images")
+            print(f"{Path(r).name}: {n_images} images")
         else:
-            print(f"❌ {Path(r).name}: Missing VOC folders")
+            print(f"{Path(r).name}: Missing VOC folders")
             missing_roots.append(r)
     
     if missing_roots:
         print(f"\n  Warning: {len(missing_roots)} dataset(s) not found!")
         if is_colab:
-            print("💡 Tip: Make sure you have:")
+            print("Tip: Make sure you have:")
             print("   1. Mounted Google Drive: drive.mount('/content/drive')")
             print("   2. Uploaded data to: /content/drive/MyDrive/SegmentImg/data/")
         print("\nContinue anyway? (y/n): ", end="")
-        # Trong Colab, tự động continue
+        # in colab, auto continue
         if not is_colab:
             response = input().strip().lower()
             if response != 'y':
                 p.error("Please check your data paths and try again")
     
-    # Kiểm tra labelmap
+ 
     labelmap_path = Path(args.labelmap)
     if not labelmap_path.exists():
-        print(f"\n❌ Labelmap not found: {args.labelmap}")
+        print(f"\nLabelmap not found: {args.labelmap}")
         if is_colab:
-            print("💡 Tip: Upload labelmap.txt to /content/ or /content/drive/MyDrive/SegmentImg/")
+            print("Tip: Upload labelmap.txt to /content/ or /content/drive/MyDrive/SegmentImg/")
         p.error(f"Labelmap file not found: {args.labelmap}")
     else:
-        print(f"✅ Labelmap: {args.labelmap}")
-    
-    # Kiểm tra và tạo save directory
+        print(f"Labelmap: {args.labelmap}")
+
     save_dir_path = Path(args.save_dir)
     save_dir_path.mkdir(parents=True, exist_ok=True)
-    print(f"💾 Save directory: {args.save_dir}")
+    print(f"Save directory: {args.save_dir}")
     print("="*60 + "\n")
     
     set_seed(args.seed)
@@ -1235,8 +1148,6 @@ def main_unet():
         model = build_unet_with_boundary(num_classes=num_classes, dropout=0.2)
     elif args.architecture == "attention_unet":
         model = build_attention_unet(num_classes=num_classes, dropout=0.2)
-    elif args.architecture == "unet_plusplus":
-        model = build_unet_plusplus(num_classes=num_classes, dropout=0.2, deep_supervision=args.deep_supervision)
     elif args.architecture == "unet_backbone":
         model = build_unet_with_backbone(num_classes=num_classes, backbone=args.backbone, 
                                         backbone_name=args.backbone_name, dropout=0.2)

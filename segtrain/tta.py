@@ -1,7 +1,9 @@
 '''
 tta = test time augmentation
-'''
+run model on original img as some augmented version 
+Why do this? squeeze accuracy/robustness 
 
+'''
 
 import numpy as np, tensorflow as tf
 
@@ -27,6 +29,12 @@ class TTAInference:
         return arr
 
     def predict(self, img):
+        '''
+        run model -> semantic logits -> convert sem_logits to probability 
+        -> every tta_trans, trans img, run model, softmax prob, reverse trans to prob map, append to list 
+        -> avg all prob -> return first item is the final pixel-wise class index map, 
+        and the second is the per-class probability for each pixel.
+        '''
         img_tf = tf.expand_dims(tf.constant(img, dtype=tf.float32), 0)
         outputs = self.model(img_tf, training=False)
         sem_logits = outputs[0] if isinstance(outputs, list) else (outputs.get("sem_logits") if isinstance(outputs, dict) else outputs)

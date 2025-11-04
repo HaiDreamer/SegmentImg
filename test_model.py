@@ -129,7 +129,7 @@ def main():
     # Press-Run defaults:
     if len(sys.argv) == 1:
         ap.set_defaults(
-            model_path = r"D:\animal_data\models\unet_boundary_best.keras",
+            model_path = r"D:\animal_data\models\unet_boundary_best_v2.keras",
             image_path = r"D:\animal_data\img_segment\data\cheetah\JPEGImages\00000000_512resized.png",
             output_dir = r"D:\animal_data\img_segment",
             save_boundary = True

@@ -8,7 +8,7 @@ def set_seed(seed: int = 0):
     tf.random.set_seed(seed)
 
 def guess_google_drive_windows() -> Optional[Path]:
-    # Try common streamed letters
+    '''Guess where your Google Drive “My Drive” is on Windows'''
     for letter in "GHIJKLMNOPQRSTUVWXYZ":
         p = Path(f"{letter}:/My Drive")
         if p.exists():

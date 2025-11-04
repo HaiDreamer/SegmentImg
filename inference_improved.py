@@ -12,6 +12,12 @@ from model_train_v3_improved import (
     read_labelmap, TTAInference, PostProcessor, inference_pipeline
 )
 
+'''
+Runs semantic-segmentation inference on a single image using a saved Keras model. 
+Optionally applies Test-Time Augmentation (e.g., flips/rotations) and merges predictions for extra robustness. 
+Optionally refines the mask with post-processing (morphology) and DenseCRF edge-aware smoothing, then saves to --output_path
+'''
+
 def main():
     parser = argparse.ArgumentParser(description="Improved inference with TTA and post-processing")
     parser.add_argument("--model_path", type=str, required=True, help="Path to saved model")

@@ -8,6 +8,15 @@ try:
 except Exception:
     CRF_AVAILABLE = False
 
+'''
+apply_morphology: erosion then dilation, fill up small holes/gaps in foreground regions
+filter_small_blobs: remove tiny connected component, keeps only area ≥ min_blob_size
+apply_crf: converts softmax probabilities to unary energies (-log p), adds Gaussian and bilateral 
+            pairwise terms to snap labels to image edges, performs mean-field inference for crf_iters 
+            returns: argmax labels
+
+'''
+
 class PostProcessor:
     def __init__(self, use_morphology=True, morphology_size=3, min_blob_size=100, use_crf=False, crf_iters=5):
         self.use_morphology = use_morphology
