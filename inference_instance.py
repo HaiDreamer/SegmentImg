@@ -10,6 +10,10 @@ from model_train_v4_improved import (
     read_labelmap, instances_from_sem_and_boundary
 )
 
+'''
+use model for instance semantic of an image
+'''
+
 def preprocess_image(img: Image.Image) -> np.ndarray:
     img_np = np.asarray(img, dtype=np.float32) / 255.0
     mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)

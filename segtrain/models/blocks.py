@@ -12,6 +12,7 @@ def double_conv_block(x, n_filters, use_bn=True):
     return x
 
 def attention_gate(g, x, n_filters):
+    '''filters a skip connection -> only the encoder features that are relevant pass through'''
     theta_g = layers.Conv2D(n_filters, 1, padding="same")(g)
     phi_x = layers.Conv2D(n_filters, 1, padding="same")(x)
     add = layers.Add()([theta_g, phi_x])

@@ -1,6 +1,13 @@
 from keras import layers, Model
 from .blocks import downsample_block, upsample_block, double_conv_block
 
+'''
+Attention U-Net inserts attention gates on those skips so the decoder only pulls through features that matter for the target object, 
+    reducing clutter and false positives
+Pros: Better focus on relevant regions (attention) and crisper borders (boundary supervision) with modest overhead. 
+Cons: Slightly more complexity—extra loss/balance for the edge head, and attention modules add parameters/ops compared with the plain U-Net.
+'''
+
 def build_attention_unet(input_shape=(512,512,3), num_classes=6, dropout=0.2, use_batchnorm=True):
     inputs = layers.Input(shape=input_shape)
     f1, p1 = downsample_block(inputs, 64, dropout, use_batchnorm)

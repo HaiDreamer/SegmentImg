@@ -1,6 +1,12 @@
 from keras import layers, Model
 from .blocks import downsample_block, upsample_block, double_conv_block
 
+'''standard U-Net model
+original U-Net pattern: a contracting path of repeated convs + downsampling to capture context 
+a bottleneck at the coarsest scale (double_conv_block with 1024 filters), then an expanding path that upsamples and concatenates 
+skip connections from matching encoder stages (upsample_block) which pairs localization (decoder) with context (encoder).
+'''
+
 def build_unet_with_boundary(input_shape=(512,512,3), num_classes=6, dropout=0.2, use_batchnorm=True):
     inputs = layers.Input(shape=input_shape)
     f1, p1 = downsample_block(inputs, 64, dropout, use_batchnorm)
@@ -12,6 +18,6 @@ def build_unet_with_boundary(input_shape=(512,512,3), num_classes=6, dropout=0.2
     u7 = upsample_block(u6, f3, 256, dropout, use_batchnorm)
     u8 = upsample_block(u7, f2, 128, dropout, use_batchnorm)
     u9 = upsample_block(u8, f1, 64, dropout, use_batchnorm)
-    sem = layers.Conv2D(num_classes, 1, padding="same", name="sem_logits")(u9)
-    bnd = layers.Conv2D(1, 1, padding="same", name="boundary_logits")(u9)
+    sem = layers.Conv2D(num_classes, 1, padding="same", name="sem_logits")(u9)  # sem-logit
+    bnd = layers.Conv2D(1, 1, padding="same", name="boundary_logits")(u9)       # boundary-logit
     return Model(inputs, [sem, bnd], name="UNetBoundary")

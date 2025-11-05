@@ -7,6 +7,11 @@ from segtrain.data.labelmap import read_labelmap
 from segtrain.tta import TTAInference
 from segtrain.postprocess import PostProcessor
 
+'''
+SHORT version for your animal segmentation project
+load model, img → normalize img → fit to crop_size → (optional TTA) predict → resize back → (optional) clean up → colorize and save img
+'''
+
 def inference_pipeline(model_path: str, image_path: str, output_path: str,
                        labelmap_path: str, crop_size: int = 512,
                        use_tta: bool = True, use_postprocessing: bool = True):

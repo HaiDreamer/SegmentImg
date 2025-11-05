@@ -133,7 +133,7 @@ def check_paths(roots, labelmap, save_dir, is_colab: bool):
     if not lp.exists():
         print(f"\nLabelmap not found: {labelmap}")
         if is_colab:
-            print("💡 Tip: Upload labelmap.txt to /content/ or /content/drive/MyDrive/SegmentImg/")
+            print("Tip: Upload labelmap.txt to /content/ or /content/drive/MyDrive/SegmentImg/")
         raise SystemExit(f"Labelmap file not found: {labelmap}")
     else: print(f"Labelmap: {labelmap}")
 

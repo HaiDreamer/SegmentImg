@@ -1,5 +1,15 @@
 from keras import layers, Model
 from .blocks import double_conv_block
+
+'''
+Encoder = pretrained classification backbone (EfficientNet/ResNet)
+
+
+
+Semantic and boundary
+'''
+
+
 EFFICIENTNET_AVAILABLE = RESNET_AVAILABLE = True
 try:
     from keras.applications import EfficientNetB0, EfficientNetB3, EfficientNetB4
